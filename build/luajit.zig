@@ -44,28 +44,8 @@ pub fn configure(
 
     // Generate the buildvm_arch.h file using minilua
     const dynasm_run = b.addRunArtifact(minilua);
-
-    if (b.graph.host.result.os.tag == .windows) {
-        // Patch windows cross build for LuaJIT
-        const sourceDynasmFile = upstream.path("dynasm/dynasm.lua");
-        const destDynasmFile = upstream.path("dynasm/dynasm-patched.lua");
-        const patchDynasm = applyPatchToFile(b, b.graph.host, sourceDynasmFile, b.path("build/luajit.patch"), "dynasm-patched.lua");
-
-        const copyPatchedDynasm = b.addSystemCommand(&[_][]const u8{
-            "cmd",
-        });
-        copyPatchedDynasm.addArgs(&.{ "/q", "/c", "copy" });
-        copyPatchedDynasm.step.dependOn(&patchDynasm.run.step);
-        copyPatchedDynasm.addFileArg(patchDynasm.output);
-        copyPatchedDynasm.addFileArg(destDynasmFile);
-
-        dynasm_run.step.dependOn(&patchDynasm.run.step);
-        dynasm_run.step.dependOn(&copyPatchedDynasm.step);
-
-        dynasm_run.addFileArg(destDynasmFile);
-    } else {
-        dynasm_run.addFileArg(upstream.path("dynasm/dynasm.lua"));
-    }
+    // Remove path(luajit fixed it, we don't need fix again)
+    dynasm_run.addFileArg(upstream.path("dynasm/dynasm.lua"));
 
     // Patch lj_prng.c for FreeBSD SSP
     if (b.graph.host.result.os.tag == .freebsd) {
