@@ -1,0 +1,64 @@
+name: Sync Upstream & Update LuaJIT
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync-and-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Step 1: Merge code from ziglua
+      - name: Merge upstream ziglua
+        run: |
+          git remote add upstream https://github.com/natecraddock/ziglua.git
+          git fetch upstream main
+          git merge upstream/main --no-edit
+
+      # Step 2: Install zig and bump luajit
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: master
+
+      - name: Bump LuaJIT to latest v2.1 commit
+        run: |
+          LATEST_SHA=$(git ls-remote https://github.com/LuaJIT/LuaJIT.git refs/heads/v2.1 | cut -f1)
+          if [ -z "$LATEST_SHA" ]; then
+            echo "Can't get commit from luajit v2.1"
+            exit 1
+          fi
+          echo "Latest LuaJIT commit: $LATEST_SHA"
+          zig fetch --save=luajit "https://github.com/LuaJIT/LuaJIT/archive/${LATEST_SHA}.tar.gz"
+
+      - name: Run tests
+        run: zig build test -Dlang=luajit
+
+      # Step 3: Commit and push
+      - name: Commit and push
+        run: |
+          if ! git diff --quiet -- build.zig.zon; then
+            git add build.zig.zon
+            git commit -m "chore: bump luajit to latest v2.1 commit"
+          fi
+          git push origin HEAD:main
