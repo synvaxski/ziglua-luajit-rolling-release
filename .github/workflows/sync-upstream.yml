@@ -2,7 +2,7 @@ name: Sync Upstream & Update LuaJIT
 
 on:
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: '13 3 * * 1'
   workflow_dispatch:
 
 permissions:
